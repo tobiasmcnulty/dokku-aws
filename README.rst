@@ -21,13 +21,19 @@ for allowing deploys via the ``dokku`` user).
 .. _dokku-stack: https://console.aws.amazon.com/cloudformation/home?#/stacks/new?stackName=my-dokku-stack&templateURL=https://s3.amazonaws.com/dokku-aws/dokku_stack.json
 .. _underlying template: https://s3.amazonaws.com/dokku-aws/dokku_stack.json
 
+DNS
+---
+
 After the stack is created, you'll want to inspect the Outputs for the PublicIP of the instance and
 create a DNS ``A`` record (possibly including a wildcard record) for your chosen domain.
+
+Deployment
+----------
 
 Dokku may take 5-10 minutes to install, even after the stack has finished creating. Once that's complete,
 create a new app on the remote server::
 
-	ssh dokku@<your domain or IP> apps:create python-sample
+    ssh dokku@<your domain or IP> apps:create python-sample
 
 and deploy Heroku's Python sample to that app::
 
@@ -42,5 +48,18 @@ http://python-sample.<your domain or IP>/
 
 For additional help deploying to your new instance, please refer to the `Dokku documentation
 <http://dokku.viewdocs.io/dokku/deployment/application-deployment/>`_.
+
+Let's Encrypt
+-------------
+
+We might as well get a free SSL certificate from Let's Encrypt, while we're at it::
+
+    ssh ubuntu@<your domain or IP> sudo dokku plugin:install https://github.com/dokku/dokku-letsencrypt.git
+    ssh dokku@<your domain or IP> config:set --no-restart python-sample DOKKU_LETSENCRYPT_EMAIL=your@email.tld
+    ssh dokku@<your domain or IP> letsencrypt python-sample
+
+The Python sample app should now be accessible over HTTPS at https://python-sample.<your domain or IP>/
+
+Good luck and have fun!
 
 Copyright 2017 Tobias McNulty.
