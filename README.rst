@@ -21,6 +21,9 @@ to allow deploys via the ``dokku`` user).
 .. _dokku-stack: https://console.aws.amazon.com/cloudformation/home?#/stacks/new?stackName=my-dokku-stack&templateURL=https://s3.amazonaws.com/dokku-aws/dokku_stack.json
 .. _underlying template: https://s3.amazonaws.com/dokku-aws/dokku_stack.json
 
+Using the default values in this template (a ``t2.micro`` instance and 30 GB of disk space), your new
+Dokku instance should fit within the `free tier <https://aws.amazon.com/free/>`_ on AWS.
+
 DNS
 ---
 
