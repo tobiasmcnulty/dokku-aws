@@ -31,6 +31,9 @@ After the stack is created, you'll want to inspect the Outputs for the PublicIP 
 create a DNS ``A`` record (possibly including a wildcard record, if you're using vhost-based apps)
 for your chosen domain.
 
+For help creating a DNS record, please refer to the `Dokku DNS documentation
+<http://dokku.viewdocs.io/dokku/configuration/dns/>`_.
+
 Deployment
 ----------
 
