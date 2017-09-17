@@ -45,7 +45,7 @@ and deploy Heroku's Python sample to that app::
 
 You should be able to watch the build complete in the output from the ``git push`` command. If the
 deploy completes successfully, you should be able to see "Hello world!" at
-http://python-sample.<your domain or IP>/
+http://python-sample.your.domain/
 
 For additional help deploying to your new instance, please refer to the `Dokku documentation
 <http://dokku.viewdocs.io/dokku/deployment/application-deployment/>`_.
@@ -59,7 +59,7 @@ We might as well get a free SSL certificate from Let's Encrypt, while we're at i
     ssh dokku@<your domain or IP> config:set --no-restart python-sample DOKKU_LETSENCRYPT_EMAIL=your@email.tld
     ssh dokku@<your domain or IP> letsencrypt python-sample
 
-The Python sample app should now be accessible over HTTPS at https://python-sample.<your domain or IP>/
+The Python sample app should now be accessible over HTTPS at https://python-sample.your.domain/
 
 Good luck and have fun!
 
