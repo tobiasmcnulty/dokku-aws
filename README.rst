@@ -10,10 +10,10 @@ which allows for some validation at build time and simplifies the management of 
 templates.
 
 You can launch a new instance by clicking the Launch Stack button below or by pointing CloudFormation
-to the `underlying template`_ manually. Before launch a stack, make sure to upload your SSH public key
+to the `underlying template`_ manually. Before launching a stack, make sure to upload your SSH public key
 to the `Key Pairs <https://console.aws.amazon.com/ec2/v2/home#KeyPairs:sort=keyName>`_ section of the
 AWS console (this will be used both to allow logins to the ``ubuntu`` user on your EC2 instance and
-for allowing deploys via the ``dokku`` user).
+to allow deploys via the ``dokku`` user).
 
 |dokku-stack|_
 
@@ -25,7 +25,8 @@ DNS
 ---
 
 After the stack is created, you'll want to inspect the Outputs for the PublicIP of the instance and
-create a DNS ``A`` record (possibly including a wildcard record) for your chosen domain.
+create a DNS ``A`` record (possibly including a wildcard record, if you're using vhost-based apps)
+for your chosen domain.
 
 Deployment
 ----------
