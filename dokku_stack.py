@@ -1,4 +1,6 @@
 import troposphere.ec2 as ec2
+import troposphere.iam as iam
+import troposphere.s3 as s3
 from troposphere import (
     Base64,
     FindInMap,
@@ -11,6 +13,14 @@ from troposphere import (
 )
 
 template = Template()
+
+arn_prefix = template.add_parameter(Parameter(
+    "ArnPrefix",
+    Description="The prefix to use for Amazon Resource Names (ARNs).",
+    Type="String",
+    Default="arn:aws",
+    AllowedValues=["arn:aws", "arn:aws-us-gov"],
+))
 
 instance_type = template.add_parameter(Parameter(
     "InstanceType",
@@ -148,6 +158,115 @@ template.add_mapping('RegionMap', {
     "us-west-2": {"AMI": "ami-8803e0f0"},
 })
 
+# CORS configuration for public and private assets buckets
+assets_cors_config = s3.CorsConfiguration(
+    CorsRules=[
+        s3.CorsRules(
+            AllowedOrigins=[
+                Join("", ["https://", Ref(dokku_hostname)]),
+                Join("", ["https://*.", Ref(dokku_hostname)]),
+            ],
+            AllowedMethods=["POST", "PUT", "HEAD", "GET"],
+            AllowedHeaders=["*"],
+        ),
+    ]
+)
+
+# Create an S3 bucket that holds statics and media
+public_assets_bucket = template.add_resource(
+    s3.Bucket(
+        "PublicAssetsBucket",
+        AccessControl=s3.PublicRead,
+        VersioningConfiguration=s3.VersioningConfiguration(Status="Enabled"),
+        DeletionPolicy="Retain",
+        CorsConfiguration=assets_cors_config,
+    )
+)
+
+# Create an S3 bucket that holds user uploads or other non-public files
+private_assets_bucket = template.add_resource(
+    s3.Bucket(
+        "PrivateAssetsBucket",
+        AccessControl=s3.Private,
+        VersioningConfiguration=s3.VersioningConfiguration(Status="Enabled"),
+        DeletionPolicy="Retain",
+        CorsConfiguration=assets_cors_config,
+    )
+)
+
+# Create an S3 bucket for database backups and other non-web accessible files
+backups_bucket = template.add_resource(
+    s3.Bucket(
+        "BackupsBucket",
+        AccessControl=s3.Private,
+        VersioningConfiguration=s3.VersioningConfiguration(Status="Enabled"),
+        DeletionPolicy="Retain",
+    )
+)
+
+# central asset management policy for use in instance roles
+assets_management_policy = iam.Policy(
+    PolicyName="AssetsManagementPolicy",
+    PolicyDocument=dict(
+        Statement=[
+            dict(
+                Effect="Allow",
+                Action=["s3:ListBucket"],
+                Resource=Join("", [Ref(arn_prefix), ":s3:::", Ref(public_assets_bucket)]),
+            ),
+            dict(
+                Effect="Allow",
+                Action=["s3:*"],
+                Resource=Join("", [Ref(arn_prefix), ":s3:::", Ref(public_assets_bucket), "/*"]),
+            ),
+            dict(
+                Effect="Allow",
+                Action=["s3:ListBucket"],
+                Resource=Join("", [Ref(arn_prefix), ":s3:::", Ref(private_assets_bucket)]),
+            ),
+            dict(
+                Effect="Allow",
+                Action=["s3:*"],
+                Resource=Join("", [Ref(arn_prefix), ":s3:::", Ref(private_assets_bucket), "/*"]),
+            ),
+            dict(
+                Effect="Allow",
+                Action=["s3:ListBucket"],
+                Resource=Join("", [Ref(arn_prefix), ":s3:::", Ref(backups_bucket)]),
+            ),
+            dict(
+                Effect="Allow",
+                Action=["s3:*"],
+                Resource=Join("", [Ref(arn_prefix), ":s3:::", Ref(backups_bucket), "/*"]),
+            ),
+        ],
+    ),
+)
+
+# EC2 instance role
+instance_role = iam.Role(
+    "InstanceRole",
+    template=template,
+    AssumeRolePolicyDocument=dict(Statement=[dict(
+        Effect="Allow",
+        Principal=dict(Service=["ec2.amazonaws.com"]),
+        Action=["sts:AssumeRole"],
+    )]),
+    Path="/",
+    Policies=[
+        assets_management_policy,
+    ]
+)
+
+# EC2 instance profile
+instance_profile = iam.InstanceProfile(
+    "InstanceProfile",
+    template=template,
+    Path="/",
+    Roles=[Ref(instance_role)],
+)
+
+# EC2 security group
 security_group = template.add_resource(ec2.SecurityGroup(
     'SecurityGroup',
     GroupDescription='Allows SSH access from SshCidr and HTTP/HTTPS access from anywhere.',
@@ -173,14 +292,17 @@ security_group = template.add_resource(ec2.SecurityGroup(
     ]
 ))
 
+# Elastic IP for EC2 instance
 eip = template.add_resource(ec2.EIP("Eip"))
 
+# The Dokku EC2 instance
 ec2_instance = template.add_resource(ec2.Instance(
     'Ec2Instance',
     ImageId=FindInMap("RegionMap", Ref("AWS::Region"), "AMI"),
     InstanceType=Ref(instance_type),
     KeyName=Ref(key_name),
     SecurityGroups=[Ref(security_group)],
+    IamInstanceProfile=Ref(instance_profile),
     BlockDeviceMappings=[
         ec2.BlockDeviceMapping(
             DeviceName="/dev/sda1",
@@ -199,13 +321,20 @@ ec2_instance = template.add_resource(ec2.Instance(
         ' DOKKU_WEB_CONFIG=', Ref(dokku_web_config),
         ' DOKKU_HOSTNAME=', Ref(dokku_hostname),
         ' DOKKU_KEY_FILE=/home/ubuntu/.ssh/authorized_keys',  # use the key configured by key_name
-        ' bash bootstrap.sh\n',
+        ' bash bootstrap.sh',
+        '\n',
+        'sudo -u dokku dokku config:set --global'
+        ' PUBLIC_ASSETS_BUCKET_NAME=', Ref(public_assets_bucket),
+        ' PRIVATE_ASSETS_BUCKET_NAME=', Ref(private_assets_bucket),
+        ' BACKUPS_BUCKET_NAME=', Ref(backups_bucket),
+        '\n',
     ])),
     Tags=Tags(
         Name=Ref("AWS::StackName"),
     ),
 ))
 
+# Associate the Elastic IP separately, so it doesn't change when the instance changes.
 eip_assoc = template.add_resource(ec2.EIPAssociation(
     "EipAssociation",
     InstanceId=Ref(ec2_instance),
