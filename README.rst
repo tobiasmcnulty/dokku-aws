@@ -5,6 +5,9 @@ This is a simple CloudFormation stack for deploying a `Dokku <http://dokku.viewd
 instance to EC2 using an Ubuntu 16.04 LTS AMI. The instance is configured with an Elastic IP, so the
 IP will stay the same in case of stack updates that require the instance to be replaced.
 
+If you wish to use your Dokku instance with S3, RDS, ElastiCache, and/or Elasticsearch, you should
+use `aws-web-stacks <https://github.com/caktus/aws-web-stacks>`_ instead.
+
 The CloudFormation templates are written in `troposphere <https://github.com/cloudtools/troposphere>`_,
 which allows for some validation at build time and simplifies the management of several related
 templates.
